@@ -54,7 +54,10 @@ function toTotals(row: any): MetaTotals {
   };
 }
 
-const BASE_FIELDS = 'spend,impressions,reach,inline_link_clicks,actions,action_values';
+/** Ordem dos "melhores anúncios": compras, depois receita, depois cliques. */
+const rankAds =(a: MetaAd, b: MetaAd) => b.purchases - a.purchases || b.revenue - a.revenue || b.clicks - a.clicks;
+
+const BASE_FIELDS ='spend,impressions,reach,inline_link_clicks,actions,action_values';
 
 function breakdown(rows: any[], key: string): BreakdownRow[] {
   return rows
@@ -81,8 +84,8 @@ export async function fetchMeta(range: DateRange): Promise<MetaData> {
     insights({ time_range: tr(range), fields: BASE_FIELDS }),
     insights({ time_range: tr(prev), fields: BASE_FIELDS }),
     insights({ time_range: tr(range), time_increment: '1', fields: BASE_FIELDS }),
-    insights({ time_range: tr(range), level: 'campaign', fields: `campaign_name,${BASE_FIELDS}` }),
-    insights({ time_range: tr(range), level: 'ad', fields: `ad_id,ad_name,${BASE_FIELDS}` }),
+    insights({ time_range: tr(range), level: 'campaign', fields: `campaign_id,campaign_name,${BASE_FIELDS}` }),
+    insights({ time_range: tr(range), level: 'ad', fields: `ad_id,ad_name,campaign_id,${BASE_FIELDS}` }),
     insights({ time_range: tr(range), breakdowns: 'age', fields: BASE_FIELDS }),
     insights({ time_range: tr(range), breakdowns: 'gender', fields: BASE_FIELDS }),
     insights({ time_range: tr(range), breakdowns: 'region', fields: BASE_FIELDS }),
@@ -91,31 +94,36 @@ export async function fetchMeta(range: DateRange): Promise<MetaData> {
   const dailyPoints: DailyPoint[] = daily.map((r) => ({ date: r.date_start, ...toTotals(r) }));
 
   const campaignRows: CampaignRow[] = campaigns
-    .map((r) => ({ name: r.campaign_name, ...toTotals(r) }))
+    .map((r) => ({ id: r.campaign_id, name: r.campaign_name, ...toTotals(r) }))
     .sort((a, b) => b.spend - a.spend);
 
+  // Todos os anúncios do período, já ordenados do melhor para o pior.
+  // A tela usa os primeiros como "melhores anúncios" e filtra por campaignId ao abrir uma campanha.
   const topAds: MetaAd[] = ads
-    .map((r) => ({ id: r.ad_id, name: r.ad_name, ...toTotals(r) }))
-    .sort((a, b) => b.purchases - a.purchases || b.revenue - a.revenue || b.clicks - a.clicks)
-    .slice(0, 6);
+    .map((r) => ({ id: r.ad_id, name: r.ad_name, campaignId: r.campaign_id, ...toTotals(r) }))
+    .sort(rankAds);
 
-  // Miniaturas dos melhores anúncios
-  if (topAds.length) {
-    try {
-      const url = new URL(API);
-      url.searchParams.set('ids', topAds.map((a) => a.id).join(','));
-      // Sem tamanho explícito a thumbnail_url vem em 64x64; pedimos 600x600 (cobre vídeos).
-      url.searchParams.set('fields', 'creative.thumbnail_width(600).thumbnail_height(600){image_url,thumbnail_url}');
-      url.searchParams.set('access_token', token);
-      const thumbs = await (await fetch(url, { cache: 'no-store' })).json();
-      for (const a of topAds) {
-        const c = thumbs?.[a.id]?.creative;
-        a.thumbnail = c?.image_url ?? c?.thumbnail_url;
+  // Miniaturas (a API aceita até 50 ids por chamada; limite de segurança de 500 anúncios)
+  const chunks: MetaAd[][] = [];
+  for (let i = 0; i < Math.min(topAds.length, 500); i += 50) chunks.push(topAds.slice(i, i + 50));
+  await Promise.all(
+    chunks.map(async (chunk) => {
+      try {
+        const url = new URL(API);
+        url.searchParams.set('ids', chunk.map((a) => a.id).join(','));
+        // Sem tamanho explícito a thumbnail_url vem em 64x64; pedimos 600x600 (cobre vídeos).
+        url.searchParams.set('fields', 'creative.thumbnail_width(600).thumbnail_height(600){image_url,thumbnail_url}');
+        url.searchParams.set('access_token', token);
+        const thumbs = await (await fetch(url, { cache: 'no-store' })).json();
+        for (const a of chunk) {
+          const c = thumbs?.[a.id]?.creative;
+          a.thumbnail = c?.image_url ?? c?.thumbnail_url;
+        }
+      } catch {
+        /* miniaturas são opcionais */
       }
-    } catch {
-      /* miniaturas são opcionais */
-    }
-  }
+    }),
+  );
 
   return {
     totals: toTotals(cur[0]),

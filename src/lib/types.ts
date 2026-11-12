@@ -16,6 +16,7 @@ export interface DailyPoint extends Totals {
 }
 
 export interface CampaignRow extends Totals {
+  id?: string;
   name: string;
 }
 
@@ -37,6 +38,7 @@ export interface MetaTotals extends Totals {
 export interface MetaAd extends Totals {
   id: string;
   name: string;
+  campaignId?: string;
   thumbnail?: string;
 }
 
@@ -45,6 +47,7 @@ export interface MetaData {
   prev: MetaTotals;
   daily: DailyPoint[];
   campaigns: CampaignRow[];
+  /** Todos os anúncios do período, do melhor para o pior (filtrar por campaignId). */
   ads: MetaAd[];
   age: BreakdownRow[];
   gender: BreakdownRow[];

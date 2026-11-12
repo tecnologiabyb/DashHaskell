@@ -65,9 +65,11 @@ export function mockMeta(range: DateRange, prev: DateRange): MetaData {
     ['[VENDAS] CATÁLOGO - ADVANTAGE+', '[VENDAS] SE CURVE - CONVERSÃO', '[VENDAS] KITS PROMOÇÃO', '[REMARKETING] CARRINHO ABANDONADO', '[TOPO] DENSI RESIST - ALCANCE'],
     totals,
     'camp',
-  ).sort((a, b) => b.spend - a.spend);
+  )
+    .map((c, i) => ({ ...c, id: `camp${i}` }))
+    .sort((a, b) => b.spend - a.spend);
   const ads = split(['Vídeo Se Curve 01', 'Carrossel Kits', 'Estático Frizz Cancelado', 'Reels Densi Resist', 'Catálogo Dinâmico', 'UGC Coloração'], totals, 'ads')
-    .map((a, i) => ({ ...a, id: String(i) }))
+    .map((a, i) => ({ ...a, id: String(i), campaignId: `camp${i % 5}` }))
     .sort((a, b) => b.purchases - a.purchases);
   return {
     totals: metaTotals(totals),
