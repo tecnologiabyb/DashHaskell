@@ -136,6 +136,7 @@ export default function Dashboard() {
             {data?.google.error && <><br />Google: {data.google.error}</>}
           </div>
         )}
+        {data?.store?.error && <div className="banner">Dados da loja indisponíveis. {data.store.error}</div>}
 
         {data ? (
           <div className={loading ? 'loading' : ''}>

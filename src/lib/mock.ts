@@ -101,5 +101,8 @@ export function mockGoogle(range: DateRange, prev: DateRange): GoogleData {
       .map((k) => ({ keyword: k.name, clicks: k.clicks, impressions: k.impressions, purchases: k.purchases, spend: k.spend }))
       .sort((a, b) => b.clicks - a.clicks),
     device: split(['Celular', 'Computador', 'Tablet'], totals, 'dev').map((d, i) => (i === 0 ? { ...d, impressions: d.impressions * 3 } : d)),
+    products: [],
+    terms: [],
+    brandSplit: { brand: zero, generic: zero },
   };
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import type { GoogleData } from '@/lib/types';
+import type { GoogleData, Totals } from '@/lib/types';
 import { brl, compact, dec, div, int, pct, roas, shortDate } from '@/lib/format';
 import { axis, C, Card, DataTable, Kpi, Legend, PIE, Stat, tooltipStyle } from './ui';
 
@@ -11,6 +11,28 @@ export default function GoogleView({ g }: { g: GoogleData }) {
   const spark = (k: 'spend' | 'purchases' | 'revenue' | 'clicks') => g.daily.map((x) => x[k]);
   const series = g.daily.map((x) => ({ date: shortDate(x.date), spend: x.spend, clicks: x.clicks, conv: x.purchases }));
   const devTotal = g.device.reduce((s, x) => s + x.clicks, 0) || 1;
+
+  // Resultado por tipo de campanha
+  const typeMap = new Map<string, Totals & { name: string }>();
+  for (const c of g.campaigns) {
+    const name = c.type ?? 'Outros';
+    const e = typeMap.get(name) ?? { name, spend: 0, impressions: 0, clicks: 0, purchases: 0, revenue: 0 };
+    e.spend += c.spend;
+    e.impressions += c.impressions;
+    e.clicks += c.clicks;
+    e.purchases += c.purchases;
+    e.revenue += c.revenue;
+    typeMap.set(name, e);
+  }
+  const types = [...typeMap.values()].sort((a, b) => b.revenue - a.revenue);
+
+  const brandRows = [
+    { name: 'Com o nome da marca', ...g.brandSplit.brand },
+    { name: 'Sem o nome da marca', ...g.brandSplit.generic },
+  ];
+  const termsSpend = g.brandSplit.brand.spend + g.brandSplit.generic.spend;
+  const termsRevenue = g.brandSplit.brand.revenue + g.brandSplit.generic.revenue;
+  const share = (v?: number) => (v === undefined ? '—' : v <= 0.0999 && v > 0.09 ? '< 10%' : v >= 0.9001 && v < 0.91 ? '> 90%' : pct(v * 100));
 
   return (
     <>
@@ -85,11 +107,83 @@ export default function GoogleView({ g }: { g: GoogleData }) {
         </Card>
       </div>
 
+      <div className="row r-google-2">
+        <Card title="Resultado por tipo de campanha">
+          <DataTable
+            rows={types}
+            columns={[
+              { key: 'n', label: 'Tipo', render: (r) => r.name },
+              { key: 's', label: 'Investimento', num: true, render: (r) => brl(r.spend) },
+              { key: 'sp', label: '% do invest.', num: true, render: (r) => pct(div(r.spend, t.spend) * 100), value: (r) => r.spend, heat: C.green },
+              { key: 'p', label: 'Compras', num: true, render: (r) => dec(r.purchases) },
+              { key: 'r', label: 'Receita', num: true, render: (r) => brl(r.revenue) },
+              { key: 'rp', label: '% da receita', num: true, render: (r) => pct(div(r.revenue, t.revenue) * 100), value: (r) => r.revenue, heat: C.purple },
+              { key: 'cpa', label: 'Custo/compra', num: true, render: (r) => brl(div(r.spend, r.purchases)) },
+              { key: 'ro', label: 'ROAS', num: true, render: (r) => roas(div(r.revenue, r.spend)) },
+            ]}
+          />
+          <p className="note">Compare a fatia do investimento com a fatia da receita: quem recebe menos verba do que entrega em receita é candidato a ganhar orçamento.</p>
+        </Card>
+
+        <Card title="Buscas com e sem o nome da marca">
+          <DataTable
+            rows={brandRows}
+            empty="Sem termos de pesquisa no período"
+            columns={[
+              { key: 'n', label: 'Busca', render: (r) => r.name },
+              { key: 's', label: 'Investimento', num: true, render: (r) => brl(r.spend) },
+              { key: 'sp', label: '% do invest.', num: true, render: (r) => pct(div(r.spend, termsSpend) * 100), value: (r) => r.spend, heat: C.green },
+              { key: 'p', label: 'Compras', num: true, render: (r) => dec(r.purchases) },
+              { key: 'r', label: 'Receita', num: true, render: (r) => brl(r.revenue) },
+              { key: 'rp', label: '% da receita', num: true, render: (r) => pct(div(r.revenue, termsRevenue) * 100), value: (r) => r.revenue, heat: C.purple },
+              { key: 'ro', label: 'ROAS', num: true, render: (r) => roas(div(r.revenue, r.spend)) },
+            ]}
+          />
+          <p className="note">
+            Considera os termos de pesquisa das campanhas de Pesquisa e Shopping (Performance Max não abre os termos aqui). Quem busca pelo nome da marca já
+            conhece a Haskell; as buscas sem a marca mostram quanto o Google traz de cliente novo.
+          </p>
+        </Card>
+      </div>
+
+      <div className="row r-google-2">
+        <Card title="Produtos anunciados (anúncios de produto)">
+          <DataTable
+            rows={g.products}
+            empty="Sem dados de produto no período"
+            columns={[
+              { key: 'n', label: 'Produto', render: (r) => r.name },
+              { key: 's', label: 'Investimento', num: true, render: (r) => brl(r.spend), value: (r) => r.spend, heat: C.green },
+              { key: 'c', label: 'Cliques', num: true, render: (r) => int(r.clicks) },
+              { key: 'p', label: 'Compras', num: true, render: (r) => dec(r.purchases) },
+              { key: 'r', label: 'Receita', num: true, render: (r) => brl(r.revenue), value: (r) => r.revenue, heat: C.purple },
+              { key: 'ro', label: 'ROAS', num: true, render: (r) => roas(div(r.revenue, r.spend)) },
+            ]}
+          />
+        </Card>
+
+        <Card title="Termos de pesquisa com maior investimento">
+          <DataTable
+            rows={g.terms}
+            empty="Sem termos de pesquisa no período"
+            columns={[
+              { key: 't', label: 'Termo', render: (r) => r.term },
+              { key: 'b', label: 'Marca', render: (r) => (r.brand ? 'Sim' : 'Não') },
+              { key: 's', label: 'Investimento', num: true, render: (r) => brl(r.spend), value: (r) => r.spend, heat: C.green },
+              { key: 'c', label: 'Cliques', num: true, render: (r) => int(r.clicks) },
+              { key: 'p', label: 'Compras', num: true, render: (r) => dec(r.purchases), value: (r) => r.purchases, heat: C.purple },
+              { key: 'ro', label: 'ROAS', num: true, render: (r) => roas(div(r.revenue, r.spend)) },
+            ]}
+          />
+        </Card>
+      </div>
+
       <Card title="Campanhas">
         <DataTable
           rows={g.campaigns}
           columns={[
             { key: 'n', label: 'Campanha', render: (r) => r.name },
+            { key: 'ty', label: 'Tipo', render: (r) => r.type ?? '—' },
             { key: 's', label: 'Investimento', num: true, render: (r) => brl(r.spend), value: (r) => r.spend, heat: C.green },
             { key: 'i', label: 'Impressões', num: true, render: (r) => int(r.impressions) },
             { key: 'c', label: 'Cliques', num: true, render: (r) => int(r.clicks) },
@@ -98,8 +192,15 @@ export default function GoogleView({ g }: { g: GoogleData }) {
             { key: 'cpa', label: 'Custo/conv.', num: true, render: (r) => brl(div(r.spend, r.purchases)) },
             { key: 'tx', label: 'Taxa de conv.', num: true, render: (r) => pct(div(r.purchases, r.clicks) * 100), value: (r) => div(r.purchases, r.clicks), heat: C.olive },
             { key: 'ro', label: 'ROAS', num: true, render: (r) => roas(div(r.revenue, r.spend)) },
+            { key: 'is', label: 'Parcela de impr.', num: true, render: (r) => share(r.impressionShare) },
+            { key: 'lb', label: 'Perdida por orçamento', num: true, render: (r) => share(r.lostBudget), value: (r) => r.lostBudget ?? 0, heat: C.lilac },
+            { key: 'lr', label: 'Perdida por classificação', num: true, render: (r) => share(r.lostRank) },
           ]}
         />
+        <p className="note">
+          Parcela de impressões: de cada 100 vezes em que o anúncio poderia aparecer, quantas apareceu. Perda por orçamento alta com ROAS bom indica campanha
+          travada por verba; perda por classificação indica lance, qualidade do anúncio ou preço do produto.
+        </p>
       </Card>
     </>
   );

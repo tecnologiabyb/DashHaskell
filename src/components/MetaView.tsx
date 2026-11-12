@@ -121,10 +121,18 @@ export default function MetaView({ m }: { m: MetaData }) {
       <div className="row r-meta-2">
         <Card title="Melhores anúncios">
           {m.ads.length ? (
-            <div className="ads" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))' }}>
+            <div className="ads best">
               {m.ads.slice(0, 6).map((a) => (
                 <div className="ad" key={a.id}>
-                  <div className="thumb">{a.thumbnail ? <img src={a.thumbnail} alt={a.name} loading="lazy" /> : 'Sem prévia'}</div>
+                  <div className="thumb">
+                    {a.thumbnail ? (
+                      <a href={a.thumbnail} target="_blank" rel="noreferrer" title="Abrir a imagem em tamanho maior">
+                        <img src={a.thumbnail} alt={a.name} loading="lazy" />
+                      </a>
+                    ) : (
+                      'Sem prévia'
+                    )}
+                  </div>
                   <div className="info">
                     <div className="n" title={a.name}>{a.name}</div>
                     <div className="m">
