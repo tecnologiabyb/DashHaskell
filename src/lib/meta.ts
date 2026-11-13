@@ -20,6 +20,12 @@ function pick(list: Action[] | undefined, types: string[]): number {
   return 0;
 }
 
+const REGION_PT: Record<string, string> = { 'Federal District': 'Distrito Federal', Unknown: 'Não informado' };
+const regionName = (name: string) => {
+  const clean = name.replace(/\s*\((state|province|region)\)\s*$/i, '').trim();
+  return REGION_PT[clean] ?? clean;
+};
+
 const num = (v: unknown) => parseFloat(String(v ?? 0)) || 0;
 
 async function get(path: string, params: Record<string, string>, token: string) {
@@ -131,11 +137,17 @@ export async function fetchMeta(range: DateRange): Promise<MetaData> {
     daily: dailyPoints,
     campaigns: campaignRows,
     ads: topAds,
-    age: breakdown(age, 'age').sort((a, b) => a.name.localeCompare(b.name)),
+    // "Unknown" vira "N/I" e vai para o fim do gráfico de idade
+    age: breakdown(age, 'age')
+      .map((a) => ({ ...a, name: a.name.toLowerCase() === 'unknown' ? 'N/I' : a.name }))
+      .sort((a, b) => Number(a.name === 'N/I') - Number(b.name === 'N/I') || a.name.localeCompare(b.name)),
     gender: breakdown(gender, 'gender').map((g) => ({
       ...g,
       name: g.name === 'female' ? 'Feminino' : g.name === 'male' ? 'Masculino' : 'Não informado',
     })),
-    region: breakdown(region, 'region').slice(0, 30),
+    // A Meta devolve "São Paulo (state)", "Federal District"... deixa só o nome do estado em português
+    region: breakdown(region, 'region')
+      .map((r) => ({ ...r, name: regionName(r.name) }))
+      .slice(0, 30),
   };
 }

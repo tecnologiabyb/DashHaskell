@@ -27,6 +27,9 @@ Enquanto `META_ACCESS_TOKEN` ou `GOOGLE_ADS_REFRESH_TOKEN` não estiverem válid
 - **Visão geral**: KPIs somados (investimento, receita, compras, ROAS, CPA, cliques), investimento diário por plataforma, compras e cliques por dia da semana, idade, gênero e região (Meta).
 - **Meta Ads**: KPIs com sparkline, funil (impressão → clique → visita → carrinho → checkout → compra), CTR, frequência, CPM, investimento x compras por dia, melhores anúncios e campanhas.
 - **Google Ads**: KPIs com sparkline, palavras-chave, série diária, cliques por dispositivo e campanhas.
+- **TikTok Ads**: KPIs com sparkline, funil (impressão → clique → visita → compra), investimento x compras por dia, cliques por idade e gênero, melhores anúncios e campanhas (clique numa campanha para ver os anúncios). Compras = evento "Pagamento concluído" do pixel; receita = valor desses pagamentos.
+
+O TikTok usa `TIKTOK_ACCESS_TOKEN` e `TIKTOK_ADVERTISER_ID` (conta Haskell Cosméticos0725). Para gerar o token: `node scripts/tiktok-token.js <auth_code>` (instruções no próprio script). Sem o token, a aba TikTok mostra um aviso e a visão geral soma só Meta + Google; com o token, o TikTok entra nos totais, na representatividade e nas impressões.
 
 A **Visão geral** também mostra as vendas reais da loja (Nuvemshop): faturamento, pedidos pagos, ticket médio e quanto a loja vende para cada R$ 1 de mídia. Esses números vêm do resumo diário mantido pelo projeto de conversões da BYB (`LOJA_API_URL` / `LOJA_API_KEY`). Sem essas variáveis, o bloco da loja não aparece e um aviso informa o motivo.
 

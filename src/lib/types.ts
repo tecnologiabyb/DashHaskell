@@ -98,6 +98,24 @@ export interface GoogleData {
   brandSplit: { brand: Totals; generic: Totals };
 }
 
+export interface TikTokTotals extends Totals {
+  reach: number;
+  landingViews: number;
+  videoViews: number;
+}
+
+export interface TikTokData {
+  totals: TikTokTotals;
+  prev: TikTokTotals;
+  daily: DailyPoint[];
+  campaigns: CampaignRow[];
+  /** Todos os anúncios do período, do melhor para o pior (filtrar por campaignId). */
+  ads: MetaAd[];
+  /** O TikTok não informa compras por idade/gênero: os gráficos usam cliques. */
+  age: BreakdownRow[];
+  gender: BreakdownRow[];
+}
+
 export interface StoreTotals {
   /** Pedidos criados (pagos ou não). */
   created: number;
@@ -142,5 +160,7 @@ export interface DashboardResponse {
   google: SourceResult<GoogleData>;
   /** Vendas reais da loja (Nuvemshop). `data` é null quando a fonte não está configurada ou falhou. */
   store: { data: StoreData | null; error?: string };
+  /** TikTok Ads. `data` é null quando o token não está configurado ou a API falhou. */
+  tiktok: { data: TikTokData | null; error?: string };
   updatedAt: string;
 }

@@ -18,15 +18,21 @@ function add(a: Totals, b: Totals): Totals {
 export default function Overview({ d }: { d: DashboardResponse }) {
   const m = d.meta.data;
   const g = d.google.data;
-  const cur = add(m.totals, g.totals);
-  const prev = add(m.prev, g.prev);
+  // TikTok só entra nos totais quando está configurado (sem dados de exemplo)
+  const tk = d.tiktok?.data ?? null;
+  const cur = tk ? add(add(m.totals, g.totals), tk.totals) : add(m.totals, g.totals);
+  const prev = tk ? add(add(m.prev, g.prev), tk.prev) : add(m.prev, g.prev);
+  const platforms = tk ? 'Meta + Google + TikTok' : 'Meta + Google';
+  const dayValue = (rows: { date: string; revenue: number; impressions: number }[] | undefined, date: string, k: 'revenue' | 'impressions') =>
+    rows?.find((x) => x.date === date)?.[k] ?? 0;
 
-  // Série diária combinada (investimento por plataforma)
-  const dates = Array.from(new Set([...m.daily, ...g.daily].map((x) => x.date))).sort();
+  // Série diária combinada (impressões por plataforma)
+  const dates = Array.from(new Set([...m.daily, ...g.daily, ...(tk?.daily ?? [])].map((x) => x.date))).sort();
   const series = dates.map((date) => ({
     date: shortDate(date),
-    meta: m.daily.find((x) => x.date === date)?.spend ?? 0,
-    google: g.daily.find((x) => x.date === date)?.spend ?? 0,
+    meta: dayValue(m.daily, date, 'impressions'),
+    google: dayValue(g.daily, date, 'impressions'),
+    tiktok: tk ? dayValue(tk.daily, date, 'impressions') : undefined,
   }));
 
   const genderTotal = m.gender.reduce((s, x) => s + x.purchases, 0) || 1;  const store = d.store?.data ?? null;
@@ -37,6 +43,7 @@ export default function Overview({ d }: { d: DashboardResponse }) {
     ? [
         { name: 'Meta Ads', color: C.purple, t: m.totals },
         { name: 'Google Ads', color: C.green, t: g.totals },
+        ...(tk ? [{ name: 'TikTok Ads', color: C.olive, t: tk.totals }] : []),
       ].map((x) => ({
         ...x,
         revShare: div(x.t.revenue, store.totals.revenue) * 100,
@@ -50,7 +57,7 @@ export default function Overview({ d }: { d: DashboardResponse }) {
     loja: store?.daily[i]?.revenue,
     anterior: store?.prevDaily[i]?.revenue,
     anteriorData: store?.prevDaily[i] ? shortDate(store.prevDaily[i].date) : '',
-    midia: (m.daily.find((x) => x.date === date)?.revenue ?? 0) + (g.daily.find((x) => x.date === date)?.revenue ?? 0),
+    midia: dayValue(m.daily, date, 'revenue') + dayValue(g.daily, date, 'revenue') + dayValue(tk?.daily, date, 'revenue'),
   }));
 
   const otherRevenue = store ? store.totals.revenue - cur.revenue : 0;
@@ -77,8 +84,9 @@ export default function Overview({ d }: { d: DashboardResponse }) {
             <Stat label="Receita atribuída ÷ faturamento" value={pct(div(cur.revenue, store.totals.revenue) * 100)} />
           </div>
           <p className="note">
-            Faturamento e pedidos vêm dos pedidos pagos da loja. A receita das plataformas (Meta + Google) é a venda que cada uma atribui a si,
-            então a mesma venda pode aparecer nas duas. Vendas de TikTok, orgânico, e-mail e clientes recorrentes entram só no faturamento da loja.
+            Faturamento e pedidos vêm dos pedidos pagos da loja. A receita das plataformas ({platforms}) é a venda que cada uma atribui a si,
+            então a mesma venda pode aparecer em mais de uma. Vendas {tk ? '' : 'de TikTok, '}orgânicas, de e-mail e de clientes recorrentes entram só no
+            faturamento da loja.
           </p>
         </Card>
       )}
@@ -122,7 +130,7 @@ export default function Overview({ d }: { d: DashboardResponse }) {
           </div>
           <p className="note">
             {otherRevenue >= 0
-              ? 'Cada porcentagem é a receita que a plataforma atribui a si dividida pelo faturamento da loja no período. O restante vem de busca orgânica, acesso direto, e-mail, TikTok e clientes recorrentes.'
+              ? `Cada porcentagem é a receita que a plataforma atribui a si dividida pelo faturamento da loja no período. O restante vem de busca orgânica, acesso direto, e-mail${tk ? '' : ', TikTok'} e clientes recorrentes.`
               : 'As plataformas somadas atribuem a si mais do que a loja faturou no período: a mesma venda está sendo contada por mais de uma delas.'}
           </p>
         </Card>
@@ -132,7 +140,7 @@ export default function Overview({ d }: { d: DashboardResponse }) {
         <div className="stats inline col-on-mobile">
           {store && <Stat label="Receita da loja no período" value={brl(store.totals.revenue)} cur={store.totals.revenue} prev={store.prev.revenue} />}
           {store && <Stat label="Período anterior" value={brl(store.prev.revenue)} />}
-          <Stat label="Receita atribuída (Meta + Google)" value={brl(cur.revenue)} cur={cur.revenue} prev={prev.revenue} />
+          <Stat label={`Receita atribuída (${platforms})`} value={brl(cur.revenue)} cur={cur.revenue} prev={prev.revenue} />
           {store && <Stat label="Média por dia na loja" value={brl(div(store.totals.revenue, store.daily.length))} cur={div(store.totals.revenue, store.daily.length)} prev={div(store.prev.revenue, store.prevDaily.length)} />}
         </div>
         <div style={{ height: 280, marginTop: 12 }}>
@@ -146,7 +154,7 @@ export default function Overview({ d }: { d: DashboardResponse }) {
                 formatter={(v, n, item) => [brl(Number(v)), n === 'Loja · período anterior' && item?.payload?.anteriorData ? `${n} (${item.payload.anteriorData})` : n]}
               />
               {store && <Line dataKey="anterior" name="Loja · período anterior" stroke={C.grey} strokeWidth={2} strokeDasharray="5 4" dot={false} />}
-              <Line dataKey="midia" name="Atribuída Meta + Google" stroke={C.purple} strokeWidth={2} dot={false} />
+              <Line dataKey="midia" name={`Atribuída ${platforms}`} stroke={C.purple} strokeWidth={2} dot={false} />
               {store && <Line dataKey="loja" name="Loja · período atual" stroke={C.green} strokeWidth={3} dot={false} />}
             </LineChart>
           </ResponsiveContainer>
@@ -154,33 +162,41 @@ export default function Overview({ d }: { d: DashboardResponse }) {
         <Legend
           items={[
             ...(store ? [{ label: 'Loja · período atual', color: C.green }, { label: 'Loja · período anterior (tracejado)', color: C.grey }] : []),
-            { label: 'Receita atribuída Meta + Google', color: C.purple },
+            { label: `Receita atribuída ${platforms}`, color: C.purple },
           ]}
         />
       </Card>
 
       <div className="row r-overview-1">
         <Card title="Impressões totais">
-          <Kpi label="Meta + Google" value={int(cur.impressions)} cur={cur.impressions} prev={prev.impressions} color={C.green} />
+          <Kpi label={platforms} value={int(cur.impressions)} cur={cur.impressions} prev={prev.impressions} color={C.green} />
           <div style={{ height: 190, marginTop: 12 }}>
             <ResponsiveContainer>
               <LineChart data={series} margin={{ top: 6, right: 8, left: -10, bottom: 0 }}>
                 <CartesianGrid stroke="#eee" vertical={false} />
                 <XAxis dataKey="date" tick={axis} tickLine={false} axisLine={false} minTickGap={16} />
                 <YAxis tick={axis} tickLine={false} axisLine={false} tickFormatter={compact} />
-                <Tooltip {...tooltipStyle} formatter={(v) => brl(Number(v))} />
+                <Tooltip {...tooltipStyle} formatter={(v) => int(Number(v))} />
                 <Line dataKey="meta" name="Meta Ads" stroke={C.purple} strokeWidth={2} dot={false} />
                 <Line dataKey="google" name="Google Ads" stroke={C.green} strokeWidth={2} dot={false} />
+                {tk && <Line dataKey="tiktok" name="TikTok Ads" stroke={C.olive} strokeWidth={2} dot={false} />}
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <Legend items={[{ label: 'Investimento Meta', color: C.purple }, { label: 'Investimento Google', color: C.green }]} />
+          <Legend
+            items={[
+              { label: 'Impressões Meta', color: C.purple },
+              { label: 'Impressões Google', color: C.green },
+              ...(tk ? [{ label: 'Impressões TikTok', color: C.olive }] : []),
+            ]}
+          />
         </Card>
 
         <Card title="Meta Ads">
           <div className="split">
-            <div style={{ height: 220 }}>
-              <ResponsiveContainer>
+            <div>
+              {/* altura fixa no gráfico (e não no bloco) para a legenda não sobrepor o eixo */}
+              <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={byWeekday(m.daily, 'purchases')} margin={{ top: 16, right: 4, left: -18, bottom: 0 }}>
                   <CartesianGrid stroke="#eee" vertical={false} />
                   <XAxis dataKey="name" tick={axis} tickLine={false} axisLine={false} interval={0} />
@@ -201,8 +217,9 @@ export default function Overview({ d }: { d: DashboardResponse }) {
 
         <Card title="Google Ads">
           <div className="split">
-            <div style={{ height: 220 }}>
-              <ResponsiveContainer>
+            <div>
+              {/* altura fixa no gráfico (e não no bloco) para a legenda não sobrepor o eixo */}
+              <ResponsiveContainer width="100%" height={200}>
                 <BarChart data={byWeekday(g.daily, 'clicks')} margin={{ top: 16, right: 4, left: -18, bottom: 0 }}>
                   <CartesianGrid stroke="#eee" vertical={false} />
                   <XAxis dataKey="name" tick={axis} tickLine={false} axisLine={false} interval={0} />
@@ -225,11 +242,12 @@ export default function Overview({ d }: { d: DashboardResponse }) {
       <div className="row r-overview-2">
         <Card title="Dados demográficos (Meta) · compras">
           <div className="split">
-            <div style={{ height: 220 }}>
-              <ResponsiveContainer>
-                <BarChart data={m.age} margin={{ top: 16, right: 4, left: -10, bottom: 0 }}>
+            <div>
+              {/* altura fixa no gráfico (e não no bloco) para a legenda não sobrepor o eixo */}
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={m.age} margin={{ top: 16, right: 4, left: -18, bottom: 0 }}>
                   <CartesianGrid stroke="#eee" vertical={false} />
-                  <XAxis dataKey="name" tick={axis} tickLine={false} axisLine={false} interval={0} />
+                  <XAxis dataKey="name" tick={{ ...axis, fontSize: 10 }} tickLine={false} axisLine={false} interval={0} />
                   <YAxis tick={axis} tickLine={false} axisLine={false} />
                   <Tooltip {...tooltipStyle} formatter={(v) => [dec(Number(v)), 'Compras']} cursor={{ fill: '#e3efe9' }} />
                   <Bar dataKey="purchases" fill={C.olive} radius={[5, 5, 0, 0]} />

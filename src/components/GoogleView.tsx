@@ -5,6 +5,16 @@ import type { GoogleData, Totals } from '@/lib/types';
 import { brl, compact, dec, div, int, pct, roas, shortDate } from '@/lib/format';
 import { axis, C, Card, DataTable, Kpi, Legend, PIE, Stat, tooltipStyle } from './ui';
 
+/** Valor com a fatia do total logo abaixo (ex.: "R$ 789,70" / "49,6% do total"). */
+function withShare(value: string, share: number) {
+  return (
+    <>
+      {value}
+      <small className="sub">{pct(share * 100)} do total</small>
+    </>
+  );
+}
+
 export default function GoogleView({ g }: { g: GoogleData }) {
   const t = g.totals;
   const p = g.prev;
@@ -112,12 +122,10 @@ export default function GoogleView({ g }: { g: GoogleData }) {
           <DataTable
             rows={types}
             columns={[
-              { key: 'n', label: 'Tipo', render: (r) => r.name },
-              { key: 's', label: 'Investimento', num: true, render: (r) => brl(r.spend) },
-              { key: 'sp', label: '% do invest.', num: true, render: (r) => pct(div(r.spend, t.spend) * 100), value: (r) => r.spend, heat: C.green },
+              { key: 'n', label: 'Tipo', cls: 'name wrap', render: (r) => r.name },
+              { key: 's', label: 'Investimento', num: true, render: (r) => withShare(brl(r.spend), div(r.spend, t.spend)), value: (r) => r.spend, heat: C.green },
               { key: 'p', label: 'Compras', num: true, render: (r) => dec(r.purchases) },
-              { key: 'r', label: 'Receita', num: true, render: (r) => brl(r.revenue) },
-              { key: 'rp', label: '% da receita', num: true, render: (r) => pct(div(r.revenue, t.revenue) * 100), value: (r) => r.revenue, heat: C.purple },
+              { key: 'r', label: 'Receita', num: true, render: (r) => withShare(brl(r.revenue), div(r.revenue, t.revenue)), value: (r) => r.revenue, heat: C.purple },
               { key: 'cpa', label: 'Custo/compra', num: true, render: (r) => brl(div(r.spend, r.purchases)) },
               { key: 'ro', label: 'ROAS', num: true, render: (r) => roas(div(r.revenue, r.spend)) },
             ]}
@@ -131,11 +139,9 @@ export default function GoogleView({ g }: { g: GoogleData }) {
             empty="Sem termos de pesquisa no período"
             columns={[
               { key: 'n', label: 'Busca', render: (r) => r.name },
-              { key: 's', label: 'Investimento', num: true, render: (r) => brl(r.spend) },
-              { key: 'sp', label: '% do invest.', num: true, render: (r) => pct(div(r.spend, termsSpend) * 100), value: (r) => r.spend, heat: C.green },
+              { key: 's', label: 'Investimento', num: true, render: (r) => withShare(brl(r.spend), div(r.spend, termsSpend)), value: (r) => r.spend, heat: C.green },
               { key: 'p', label: 'Compras', num: true, render: (r) => dec(r.purchases) },
-              { key: 'r', label: 'Receita', num: true, render: (r) => brl(r.revenue) },
-              { key: 'rp', label: '% da receita', num: true, render: (r) => pct(div(r.revenue, termsRevenue) * 100), value: (r) => r.revenue, heat: C.purple },
+              { key: 'r', label: 'Receita', num: true, render: (r) => withShare(brl(r.revenue), div(r.revenue, termsRevenue)), value: (r) => r.revenue, heat: C.purple },
               { key: 'ro', label: 'ROAS', num: true, render: (r) => roas(div(r.revenue, r.spend)) },
             ]}
           />
@@ -183,7 +189,7 @@ export default function GoogleView({ g }: { g: GoogleData }) {
           rows={g.campaigns}
           columns={[
             { key: 'n', label: 'Campanha', render: (r) => r.name },
-            { key: 'ty', label: 'Tipo', render: (r) => r.type ?? '—' },
+            { key: 'ty', label: 'Tipo', cls: 'wrap', render: (r) => r.type ?? '—' },
             { key: 's', label: 'Investimento', num: true, render: (r) => brl(r.spend), value: (r) => r.spend, heat: C.green },
             { key: 'i', label: 'Impressões', num: true, render: (r) => int(r.impressions) },
             { key: 'c', label: 'Cliques', num: true, render: (r) => int(r.clicks) },

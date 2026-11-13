@@ -6,12 +6,14 @@ import { longDate } from '@/lib/format';
 import Overview from '@/components/Overview';
 import MetaView from '@/components/MetaView';
 import GoogleView from '@/components/GoogleView';
+import TikTokView from '@/components/TikTokView';
 
-type Tab = 'overview' | 'meta' | 'google';
+type Tab = 'overview' | 'meta' | 'google' | 'tiktok';
 const TABS: { id: Tab; label: string; title: string }[] = [
   { id: 'overview', label: 'Visão geral', title: 'Meta Ads + Google Ads' },
   { id: 'meta', label: 'Meta Ads', title: 'Meta Ads' },
   { id: 'google', label: 'Google Ads', title: 'Google Ads' },
+  { id: 'tiktok', label: 'TikTok Ads', title: 'TikTok Ads' },
 ];
 
 const iso = (d: Date) => {
@@ -104,7 +106,7 @@ export default function Dashboard() {
       <main className="main">
         <header className="topbar">
           <div>
-            <h1>{current.title}</h1>
+            <h1>{tab === 'overview' && data?.tiktok?.data ? 'Meta + Google + TikTok Ads' : current.title}</h1>
             <div className="sub">
               Relatório de marketing | <b>Haskell Cosméticos</b>
               {data && <> · comparando com {longDate(data.prevRange.start)} – {longDate(data.prevRange.end)}</>}
@@ -143,6 +145,14 @@ export default function Dashboard() {
             {tab === 'overview' && <Overview d={data} />}
             {tab === 'meta' && <MetaView m={data.meta.data} />}
             {tab === 'google' && <GoogleView g={data.google.data} />}
+            {tab === 'tiktok' &&
+              (data.tiktok?.data ? (
+                <TikTokView t={data.tiktok.data} />
+              ) : (
+                <div className="banner">
+                  <b>Dados do TikTok indisponíveis.</b> {data.tiktok?.error ?? 'A fonte do TikTok não respondeu.'}
+                </div>
+              ))}
           </div>
         ) : (
           !error && <div className="empty">Carregando dados…</div>

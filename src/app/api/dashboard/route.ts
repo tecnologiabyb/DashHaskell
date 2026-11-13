@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchMeta } from '@/lib/meta';
 import { fetchGoogle } from '@/lib/google';
 import { fetchStore } from '@/lib/loja';
+import { fetchTikTok } from '@/lib/tiktok';
 import { mockGoogle, mockMeta } from '@/lib/mock';
 import { isValidRange, previousRange, toISO } from '@/lib/dates';
-import type { DashboardResponse, DateRange, SourceResult, StoreData } from '@/lib/types';
+import type { DashboardResponse, DateRange, SourceResult, StoreData, TikTokData } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,10 +23,11 @@ async function safe<T>(fn: () => Promise<T>, fallback: () => T): Promise<SourceR
   }
 }
 
-// A loja não tem dados de exemplo: sem configuração ou com erro, os cartões da loja somem.
-async function storeOrNull(range: DateRange): Promise<{ data: StoreData | null; error?: string }> {
+// Loja e TikTok não têm dados de exemplo: sem configuração ou com erro, os blocos deles somem
+// (para não misturar números fictícios nos totais da visão geral).
+async function orNull<T>(fn: () => Promise<T>): Promise<{ data: T | null; error?: string }> {
   try {
-    return { data: await fetchStore(range) };
+    return { data: await fn() };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(msg);
@@ -46,13 +48,14 @@ export async function GET(req: NextRequest) {
   if (hit && Date.now() - hit.at < TTL && sp.get('refresh') !== '1') return NextResponse.json(hit.body);
 
   const prevRange = previousRange(range);
-  const [meta, google, store] = await Promise.all([
+  const [meta, google, store, tiktok] = await Promise.all([
     safe(() => fetchMeta(range), () => mockMeta(range, prevRange)),
     safe(() => fetchGoogle(range), () => mockGoogle(range, prevRange)),
-    storeOrNull(range),
+    orNull<StoreData>(() => fetchStore(range)),
+    orNull<TikTokData>(() => fetchTikTok(range)),
   ]);
 
-  const body: DashboardResponse = { range, prevRange, meta, google, store, updatedAt: new Date().toISOString() };
+  const body: DashboardResponse = { range, prevRange, meta, google, store, tiktok, updatedAt: new Date().toISOString() };
   if (!meta.mock && !google.mock) cache.set(key, { at: Date.now(), body });
   return NextResponse.json(body);
 }
